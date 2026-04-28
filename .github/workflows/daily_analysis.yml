@@ -57,6 +57,7 @@ jobs:
           mkdir -p data logs reports
       
       - name: 执行股票分析
+        # 在环境变量部分添加以下配置
         env:
           # ==========================================
           # AI 配置
@@ -84,10 +85,11 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || secrets.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022' }}
           
-  # ==========================================
-  # 运行配置
-  # ==========================================
-  AI_PROVIDER_PRIORITY: ${{ vars.AI_PROVIDER_PRIORITY || secrets.AI_PROVIDER_PRIORITY || 'nvidia,gemini,aihubmix,openai,anthropic' }}
+          # ==========================================
+          # 运行配置
+          # ==========================================
+          AI_PROVIDER_PRIORITY: ${{ vars.AI_PROVIDER_PRIORITY || secrets.AI_PROVIDER_PRIORITY || 'nvidia,gemini,aihubmix,openai,anthropic' }}
+      
           # ==========================================
           # 数据源
           # ==========================================
