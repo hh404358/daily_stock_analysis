@@ -68,7 +68,11 @@ def parse_arguments() -> argparse.Namespace:
   python main.py --no-notify        # 不发送推送通知
   python main.py --single-notify    # 启用单股推送模式（每分析完一只立即推送）
   python main.py --schedule         # 启用定时任务模式
+  python main.py --enhanced-schedule # 启用增强版定时任务模式（早盘+午盘+复盘）
   python main.py --market-review    # 仅运行大盘复盘
+  python main.py --morning          # 仅运行早盘分析
+  python main.py --noon             # 仅运行午盘总结
+  python main.py --evening          # 仅运行晚间复盘
         '''
     )
 
@@ -208,6 +212,32 @@ def parse_arguments() -> argparse.Namespace:
         '--backtest-force',
         action='store_true',
         help='强制回测（即使已有回测结果也重新计算）'
+    )
+
+    # === 增强版定时任务 ===
+    parser.add_argument(
+        '--enhanced-schedule',
+        action='store_true',
+        help='启用增强版定时任务模式（早盘8:30+午盘12:00+复盘16:30）'
+    )
+
+    # === 单独时段分析 ===
+    parser.add_argument(
+        '--morning',
+        action='store_true',
+        help='仅运行早盘分析（盘前早报+交易策略）'
+    )
+
+    parser.add_argument(
+        '--noon',
+        action='store_true',
+        help='仅运行午盘总结'
+    )
+
+    parser.add_argument(
+        '--evening',
+        action='store_true',
+        help='仅运行晚间复盘'
     )
 
     return parser.parse_args()
@@ -598,7 +628,50 @@ def main() -> int:
             )
             return 0
 
-        # 模式1: 仅大盘复盘
+        # 模式1.1: 早盘分析
+        if args.morning:
+            logger.info("模式: 早盘分析")
+            from src.period_analysis import run_morning_analysis
+            run_morning_analysis()
+            return 0
+
+        # 模式1.2: 午盘总结
+        if args.noon:
+            logger.info("模式: 午盘总结")
+            from src.period_analysis import run_noon_analysis
+            run_noon_analysis()
+            return 0
+
+        # 模式1.3: 晚间复盘
+        if args.evening:
+            logger.info("模式: 晚间复盘")
+            from src.period_analysis import run_evening_analysis
+            run_evening_analysis()
+            return 0
+
+        # 模式1.4: 增强版定时任务
+        if args.enhanced_schedule:
+            logger.info("模式: 增强版定时任务")
+            logger.info("定时任务: 早盘8:30 + 午盘12:00 + 复盘16:30")
+            
+            from src.enhanced_scheduler import run_enhanced_schedule
+            from src.period_analysis import run_morning_analysis, run_noon_analysis, run_evening_analysis
+            
+            should_run_immediately = config.schedule_run_immediately
+            if getattr(args, 'no_run_immediately', False):
+                should_run_immediately = False
+            
+            logger.info(f"启动时立即执行早盘分析: {should_run_immediately}")
+            
+            run_enhanced_schedule(
+                morning_task=run_morning_analysis,
+                noon_task=run_noon_analysis,
+                evening_task=run_evening_analysis,
+                run_immediately=should_run_immediately
+            )
+            return 0
+
+        # 模式1.5: 仅大盘复盘
         if args.market_review:
             from src.analyzer import GeminiAnalyzer
             from src.core.market_review import run_market_review
