@@ -128,6 +128,12 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        '--evening',
+        action='store_true',
+        help='A股晚间复盘（等效于 --market-review）'
+    )
+
+    parser.add_argument(
         '--no-market-review',
         action='store_true',
         help='跳过大盘复盘分析'
@@ -598,8 +604,8 @@ def main() -> int:
             )
             return 0
 
-        # 模式1: 仅大盘复盘
-        if args.market_review:
+        # 模式1: 仅大盘复盘（--market-review 或 --evening）
+        if args.market_review or args.evening:
             from src.analyzer import GeminiAnalyzer
             from src.core.market_review import run_market_review
             from src.notification import NotificationService
