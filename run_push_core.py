@@ -1,21 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import subprocess
-import sys
-from pathlib import Path
-
-CORE_MODULE = Path("/workspace/run_push_core.py")
-
-def _ensure_core():
-    if CORE_MODULE.exists():
-        return
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "requests"],
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    CORE_MODULE.write_text(_CORE_CODE, encoding="utf-8")
-    print("[核心模块] 已生成")
-
-_CORE_CODE = r'''#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # RUN_PUSH_V2
 import smtplib
 import socket
@@ -39,6 +23,7 @@ def _ensure_requests():
         return
     except ImportError:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "requests"])
+        print("[依赖] requests 安装完成")
 
 _ensure_requests()
 
@@ -167,16 +152,6 @@ def main():
     else:
         print(f"文件不存在: {filepath}")
         sys.exit(1)
-
-if __name__ == "__main__":
-    main()
-'''
-
-_ensure_core()
-
-def main():
-    import run_push_core
-    run_push_core.main()
 
 if __name__ == "__main__":
     main()

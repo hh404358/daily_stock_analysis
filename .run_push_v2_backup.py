@@ -1,27 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import subprocess
-import sys
-from pathlib import Path
-
-CORE_MODULE = Path("/workspace/run_push_core.py")
-
-def _ensure_core():
-    if CORE_MODULE.exists():
-        return
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "requests"],
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    CORE_MODULE.write_text(_CORE_CODE, encoding="utf-8")
-    print("[核心模块] 已生成")
-
-_CORE_CODE = r'''#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# RUN_PUSH_V2
 import smtplib
 import socket
 import subprocess
 import sys
-import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -31,16 +13,37 @@ FEISHU_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/47549031-08ab-4b58-9c
 EMAIL_SENDER = "2770754682@qq.com"
 EMAIL_PWD = "hlcsedrvznxmdeee"
 EMAIL_RECEIVERS = ["2770754682@qq.com"]
+
 FEISHU_CHUNK_SIZE = 3800
+BACKUP_MARKER = "# RUN_PUSH_V2"
+SELF_PATH = Path(__file__).resolve()
+BACKUP_PATH = Path("/workspace/.run_push_v2_backup.py")
 
 def _ensure_requests():
     try:
         import requests
         return
     except ImportError:
+        print("[依赖] 正在安装 requests ...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "requests"])
+        print("[依赖] requests 安装完成")
 
+def _self_heal():
+    if BACKUP_MARKER in SELF_PATH.read_text(encoding="utf-8"):
+        if not BACKUP_PATH.exists() or BACKUP_MARKER not in BACKUP_PATH.read_text(encoding="utf-8"):
+            BACKUP_PATH.write_text(SELF_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+        return
+    if BACKUP_PATH.exists() and BACKUP_MARKER in BACKUP_PATH.read_text(encoding="utf-8"):
+        print("[自愈] 检测到脚本被旧版覆盖，正在从备份恢复 ...")
+        SELF_PATH.write_text(BACKUP_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+        print("[自愈] 恢复完成，重新执行 ...")
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+    else:
+        BACKUP_PATH.write_text(SELF_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+
+import os
 _ensure_requests()
+_self_heal()
 
 def send_feishu_card(url, title, content):
     import requests
@@ -48,7 +51,10 @@ def send_feishu_card(url, title, content):
         payload = {
             "msg_type": "interactive",
             "card": {
-                "header": {"title": {"tag": "plain_text", "content": title}, "template": "blue"},
+                "header": {
+                    "title": {"tag": "plain_text", "content": title},
+                    "template": "blue"
+                },
                 "elements": [{"tag": "markdown", "content": content}]
             }
         }
@@ -102,7 +108,11 @@ def send_email(sender, pwd, receivers, subject, content):
         msg["Subject"] = subject
         msg["From"] = sender
         msg["To"] = ", ".join(receivers)
-        html = '<html><body style="font-family:Microsoft YaHei;"><div style="white-space:pre-wrap;">' + content + '</div></body></html>'
+        html = (
+            '<html><body style="font-family:Microsoft YaHei;">'
+            f'<div style="white-space:pre-wrap;">{content}</div>'
+            '</body></html>'
+        )
         msg.attach(MIMEText(content, "plain", "utf-8"))
         msg.attach(MIMEText(html, "html", "utf-8"))
         with smtplib.SMTP_SSL(host="smtp.qq.com", port=465, timeout=15) as s:
@@ -134,28 +144,35 @@ def save_email_fallback(subject, content):
 def push_report(title, content):
     now = datetime.now().strftime('%Y-%m-%d %H:%M')
     full_title = f"[A股分析] {title} - {now}"
+
     print("=" * 50)
     print(f"推送任务: {full_title}")
     print(f"内容长度: {len(content)} 字符")
     print("=" * 50)
+
     print("\n[1/2] 飞书推送...")
     feishu_ok = send_feishu_chunked(FEISHU_URL, full_title, content)
+
     print("\n[2/2] 邮件推送...")
     if check_smtp_reachable():
         email_ok = send_email(EMAIL_SENDER, EMAIL_PWD, EMAIL_RECEIVERS, full_title, content)
     else:
         print("[邮件] SMTP端口不可达，降级为本地存档")
-        save_email_fallback(full_title, content)
+        eml_path = save_email_fallback(full_title, content)
         email_ok = False
+
     print("\n" + "=" * 50)
     print(f"推送结果汇总:")
-    print(f"  飞书: {'成功' if feishu_ok else '失败'}")
-    print(f"  邮件: {'成功' if email_ok else '已降级存档'}")
+    print(f"  飞书: {'✅ 成功' if feishu_ok else '❌ 失败'}")
+    print(f"  邮件: {'✅ 成功' if email_ok else '⚠️ 已降级存档'}")
     print("=" * 50)
 
-def main():
+if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("用法: python3 run_push_core.py <报告标题>")
+        print("用法: python3 run_push.py <报告标题>")
+        print("示例: python3 run_push.py 早盘分析")
+        print("      python3 run_push.py 午盘总结")
+        print("      python3 run_push.py 晚间复盘")
         sys.exit(1)
     title = sys.argv[1]
     date_str = datetime.now().strftime('%Y%m%d')
@@ -167,16 +184,3 @@ def main():
     else:
         print(f"文件不存在: {filepath}")
         sys.exit(1)
-
-if __name__ == "__main__":
-    main()
-'''
-
-_ensure_core()
-
-def main():
-    import run_push_core
-    run_push_core.main()
-
-if __name__ == "__main__":
-    main()
