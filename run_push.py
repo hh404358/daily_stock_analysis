@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -20,9 +19,7 @@ def send_email(sender, pwd, receivers, subject, content):
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject; msg["From"] = sender; msg["To"] = ", ".join(receivers)
-        html = f'<html><body style="font-family:Microsoft YaHei;"><div>{content.replace(chr(10), "<br>")}</div></body></html>'
         msg.attach(MIMEText(content, "plain", "utf-8"))
-        msg.attach(MIMEText(html, "html", "utf-8"))
         with smtplib.SMTP_SSL("smtp.qq.com", 465) as s: s.login(sender, pwd); s.sendmail(sender, receivers, msg.as_string())
         print("[邮件] 成功")
     except: pass
